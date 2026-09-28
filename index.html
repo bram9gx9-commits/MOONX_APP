@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0A0D24">
+<title>MOONX</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700&family=Unbounded:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root{
+    --night:#0A0D24;
+    --regolith:#171C46;
+    --moonlight:#EDEFF7;
+    --halo:#8E9BFF;
+    --ember:#FF9A4D;
+    --ink:#1B0F02;
+    --muted:#A3ABDB;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+  body{
+    background:radial-gradient(120% 70% at 50% 35%,#1B2260 0%,#0A0D24 62%);
+    color:var(--moonlight);
+    font-family:'Manrope',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+    -webkit-tap-highlight-color:transparent;
+    user-select:none;-webkit-user-select:none;
+  }
+  button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+  button:focus-visible{outline:2px solid var(--halo);outline-offset:3px}
+
+  #scene{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:manipulation;transition:opacity .4s}
+  body:not([data-tab="home"]) #scene{opacity:.25;pointer-events:none}
+
+  /* Fallback moon if WebGL is unavailable */
+  .css-moon{display:none;position:fixed;left:50%;top:44%;width:min(62vw,300px);aspect-ratio:1;translate:-50% -50%;border-radius:50%;
+    background:radial-gradient(circle at 32% 30%,#f2f0ea 0%,#a9a7b3 45%,#5b5a70 100%);
+    box-shadow:0 0 60px 10px rgba(142,155,255,.35)}
+  body.no3d .css-moon{display:block}
+  body.no3d[data-tab]:not([data-tab="home"]) .css-moon{display:none}
+
+  main{
+    position:fixed;inset:0;margin:0 auto;max-width:520px;
+    display:flex;flex-direction:column;pointer-events:none;
+    padding:calc(env(safe-area-inset-top,0px) + 14px) 18px calc(env(safe-area-inset-bottom,0px) + 88px);
+  }
+  .view{flex:1;display:flex;flex-direction:column;min-height:0}
+  .view[hidden]{display:none}
+
+  /* Home */
+  .greeting{font-size:14px;color:var(--muted);text-align:center;font-weight:500}
+  .balance{margin-top:8px;text-align:center;font-family:'Unbounded',system-ui,sans-serif;font-weight:600;
+    font-size:clamp(40px,13vw,58px);line-height:1;letter-spacing:-.02em}
+  .unit{font-size:15px;color:var(--halo);margin-left:8px;letter-spacing:0;font-weight:500}
+  .spacer{flex:1}
+  .hint{text-align:center;font-size:14px;color:var(--muted);margin-bottom:14px}
+  .farm{pointer-events:auto}
+  .farm-note{text-align:center;font-size:13px;color:var(--muted);margin-bottom:10px;min-height:1.3em}
+  .farm-btn{position:relative;overflow:hidden;width:100%;border-radius:999px;padding:18px 20px;
+    background:var(--ember);color:var(--ink);font-weight:700;font-size:16px;transition:transform .12s}
+  .farm-btn:active{transform:scale(.98)}
+  .farm-btn .fill{position:absolute;inset:0 auto 0 0;width:0;background:rgba(255,154,77,.42);transition:width 1s linear}
+  .farm-btn span{position:relative}
+  .farm-btn[data-state="running"]{background:var(--regolith);color:var(--moonlight);box-shadow:inset 0 0 0 1.5px rgba(255,154,77,.5)}
+
+  /* Lists */
+  .scroll{flex:1;overflow-y:auto;pointer-events:auto;padding-bottom:12px;scrollbar-width:none}
+  .scroll::-webkit-scrollbar{display:none}
+  h1{font-family:'Unbounded',system-ui,sans-serif;font-weight:600;font-size:26px;letter-spacing:-.01em;margin-top:8px}
+  .sub{color:var(--muted);font-size:15px;line-height:1.5;margin:8px 0 20px;max-width:34ch}
+  ul{list-style:none;display:flex;flex-direction:column;gap:10px}
+  .panel{background:rgba(23,28,70,.78);backdrop-filter:blur(10px);border-radius:20px;padding:14px 16px}
+  .row{display:flex;align-items:center;gap:12px}
+  .grow{flex:1;min-width:0}
+  .t-title{font-weight:700;font-size:15px}
+  .t-reward{font-size:13px;color:var(--ember);margin-top:2px;font-weight:700}
+  .pill{border-radius:999px;padding:10px 18px;background:var(--halo);color:#0B1030;font-weight:700;font-size:14px;min-width:84px}
+  .pill[disabled]{background:rgba(255,255,255,.1);color:var(--muted);cursor:default}
+  .pill.ember{background:var(--ember);color:var(--ink)}
+  .link-box{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .link-box code{flex:1;min-width:0;font-family:inherit;font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;user-select:text;-webkit-user-select:text}
+  .empty{margin-top:22px;text-align:center;color:var(--muted);font-size:14px;line-height:1.5}
+
+  /* Tab bar */
+  nav.tabs{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;
+    padding:10px 14px calc(env(safe-area-inset-bottom,0px) + 10px)}
+  .tabs-in{display:flex;gap:6px;width:min(100%,420px);padding:6px;border-radius:999px;background:rgba(23,28,70,.88);backdrop-filter:blur(14px)}
+  .tabs button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0;border-radius:999px;color:#A3ABDB;font-size:12px;font-weight:700}
+  .tabs button[aria-current="page"]{background:rgba(142,155,255,.2);color:var(--moonlight)}
+  .tabs svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+  /* Tap floaters + toast */
+  .floater{position:fixed;pointer-events:none;font-family:'Unbounded',system-ui,sans-serif;font-weight:600;font-size:22px;color:var(--moonlight);
+    text-shadow:0 2px 12px rgba(142,155,255,.8);animation:rise .8s ease-out forwards;translate:-50% -50%;z-index:5}
+  @keyframes rise{to{transform:translateY(-70px);opacity:0}}
+  .toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 14px);translate:-50% -20px;opacity:0;
+    background:var(--moonlight);color:#0B1030;padding:10px 18px;border-radius:999px;font-weight:700;font-size:14px;
+    transition:opacity .25s,translate .25s;pointer-events:none;z-index:9;white-space:nowrap}
+  .toast.show{opacity:1;translate:-50% 0}
+
+  @media (prefers-reduced-motion:reduce){
+    .floater{animation-duration:.01s}
+    .farm-btn .fill,.toast{transition:none}
+  }
+</style>
+</head>
+<body data-tab="home">
+
+<canvas id="scene" aria-label="A rotating 3D moon. Tap it to collect MOONX."></canvas>
+<button class="css-moon" id="cssMoon" aria-label="Tap the moon to collect MOONX"></button>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<main>
+  <section class="view" id="view-home">
+    <p class="greeting" id="who">Hi, Explorer</p>
+    <p class="balance"><span id="bal">0</span><span class="unit">MOONX</span></p>
+    <div class="spacer"></div>
+    <p class="hint">Tap the moon to collect MOONX</p>
+    <div class="farm">
+      <p class="farm-note" id="farmNote"></p>
+      <button class="farm-btn" id="farmBtn" data-state="idle"><i class="fill" id="farmFill"></i><span id="farmLabel">Start farming</span></button>
+    </div>
+  </section>
+
+  <section class="view scroll" id="view-tasks" hidden>
+    <h1>Tasks</h1>
+    <p class="sub">Finish a task and the reward lands in your balance.</p>
+    <ul id="taskList"></ul>
+  </section>
+
+  <section class="view scroll" id="view-friends" hidden>
+    <h1>Friends</h1>
+    <p class="sub" id="friendsSub"></p>
+    <div class="panel link-box">
+      <code id="refLink"></code>
+      <button class="pill" id="copyBtn">Copy</button>
+    </div>
+    <button class="pill ember" id="shareBtn" style="width:100%;padding:16px;font-size:16px">Invite a friend</button>
+    <p class="empty">No friends yet. People who join with your link will show up here.</p>
+  </section>
+</main>
+
+<nav class="tabs" aria-label="Main">
+  <div class="tabs-in">
+    <button data-tab="home" aria-current="page">
+      <svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>Moon
+    </button>
+    <button data-tab="tasks">
+      <svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m3.5 6 1.2 1.2L7 5M3.5 12l1.2 1.2L7 11M3.5 18l1.2 1.2L7 17"/></svg>Tasks
+    </button>
+    <button data-tab="friends">
+      <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c.6-3.2 3-5 6-5s5.4 1.8 6 5"/><circle cx="17.5" cy="9" r="2.4"/><path d="M17 14c2.4 0 3.9 1.4 4.4 4"/></svg>Friends
+    </button>
+  </div>
+</nav>
+
+<script>
+/* ============ CONFIG: edit these ============ */
+const CONFIG = {
+  botLink: 'https://t.me/YOUR_BOT/YOUR_APP',   // your bot + mini app short name from BotFather
+  tapReward: 1,
+  farmHours: 6,
+  farmReward: 120,
+  referralReward: 1000,
+  tasks: [
+    { id: 'channel', title: 'Join the MOONX channel', reward: 500, url: 'https://t.me/your_channel' },
+    { id: 'x',       title: 'Follow MOONX on X',      reward: 300, url: 'https://x.com/your_account' },
+    { id: 'roadmap', title: 'Read the roadmap',       reward: 200, url: 'https://example.com' }
+  ]
+};
+
+/* ============ Telegram ============ */
+const tg = window.Telegram && window.Telegram.WebApp;
+if (tg) {
+  try { tg.ready(); tg.expand(); tg.setHeaderColor('#0A0D24'); tg.setBackgroundColor('#0A0D24'); } catch (e) {}
+}
+const tgUser = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+const haptic = (kind) => { try { tg.HapticFeedback.impactOccurred(kind || 'light'); } catch (e) {} };
+
+/* ============ State (localStorage for now; move to your server/database later) ============ */
+const $ = (id) => document.getElementById(id);
+const load = () => { try { return JSON.parse(localStorage.getItem('moonx') || '{}'); } catch (e) { return {}; } };
+const state = Object.assign({ points: 0, farmStart: null, tasks: {} }, load());
+const save = () => { try { localStorage.setItem('moonx', JSON.stringify(state)); } catch (e) {} };
+const fmt = (n) => Math.floor(n).toLocaleString('en-US');
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function renderBalance() { $('bal').textContent = fmt(state.points); }
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast.id); toast.id = setTimeout(() => t.classList.remove('show'), 1800);
+}
+function openLink(url) {
+  if (tg) { (url.includes('t.me/') ? tg.openTelegramLink(url) : tg.openLink(url)); }
+  else window.open(url, '_blank', 'noopener');
+}
+
+/* ============ Tapping ============ */
+let pulse = 0;
+function tap(x, y) {
+  state.points += CONFIG.tapReward;
+  renderBalance(); save(); haptic('light');
+  pulse = reduce ? 0.01 : 0.045;
+  const f = document.createElement('div');
+  f.className = 'floater'; f.textContent = '+' + CONFIG.tapReward;
+  f.style.left = x + 'px'; f.style.top = y + 'px';
+  f.addEventListener('animationend', () => f.remove());
+  document.body.appendChild(f);
+}
+$('cssMoon').addEventListener('click', (e) => tap(e.clientX || innerWidth / 2, e.clientY || innerHeight / 2));
+
+/* ============ Farming ============ */
+const left = (ms) => {
+  const s = Math.ceil(ms / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  return h ? h + 'h ' + m + 'm' : m + 'm ' + (s % 60) + 's';
+};
+function farmTick() {
+  const btn = $('farmBtn'), dur = CONFIG.farmHours * 3600e3;
+  if (!state.farmStart) {
+    btn.dataset.state = 'idle'; $('farmFill').style.width = '0%';
+    $('farmLabel').textContent = 'Start farming';
+    $('farmNote').textContent = 'Farm ' + fmt(CONFIG.farmReward) + ' MOONX every ' + CONFIG.farmHours + ' hours.';
+    return;
+  }
+  const el = Date.now() - state.farmStart;
+  if (el >= dur) {
+    btn.dataset.state = 'ready'; $('farmFill').style.width = '0%';
+    $('farmLabel').textContent = 'Claim ' + fmt(CONFIG.farmReward) + ' MOONX';
+    $('farmNote').textContent = 'Your farm is full.';
+    return;
+  }
+  btn.dataset.state = 'running';
+  $('farmFill').style.width = (el / dur * 100) + '%';
+  $('farmLabel').textContent = 'Farming, ' + left(dur - el) + ' left';
+  $('farmNote').textContent = '+' + (CONFIG.farmReward * el / dur).toFixed(1) + ' MOONX so far';
+}
+$('farmBtn').addEventListener('click', () => {
+  const s = $('farmBtn').dataset.state;
+  if (s === 'idle') { state.farmStart = Date.now(); haptic('medium'); }
+  else if (s === 'ready') {
+    state.points += CONFIG.farmReward; state.farmStart = null;
+    renderBalance(); haptic('heavy'); toast('Claimed ' + fmt(CONFIG.farmReward) + ' MOONX');
+  } else { toast('Come back in ' + left(CONFIG.farmHours * 3600e3 - (Date.now() - state.farmStart))); }
+  save(); farmTick();
+});
+
+/* ============ Tasks ============ */
+function renderTasks() {
+  const list = $('taskList'); list.innerHTML = '';
+  CONFIG.tasks.forEach((t) => {
+    const st = state.tasks[t.id];
+    const li = document.createElement('li'); li.className = 'panel row';
+    const info = document.createElement('div'); info.className = 'grow';
+    const title = document.createElement('div'); title.className = 't-title'; title.textContent = t.title;
+    const rw = document.createElement('div'); rw.className = 't-reward'; rw.textContent = '+' + fmt(t.reward) + ' MOONX';
+    info.append(title, rw);
+    const b = document.createElement('button'); b.className = 'pill';
+    if (!st) b.textContent = 'Open';
+    else if (st.status === 'done') { b.textContent = 'Done'; b.disabled = true; }
+    else if (Date.now() - st.at < 5000) { b.textContent = 'Checking'; b.disabled = true; }
+    else { b.textContent = 'Claim'; b.classList.add('ember'); }
+    b.addEventListener('click', () => {
+      if (!st) {
+        openLink(t.url);
+        state.tasks[t.id] = { status: 'pending', at: Date.now() };
+        save(); renderTasks(); setTimeout(renderTasks, 5100);
+      } else if (st.status === 'pending') {
+        state.points += t.reward; state.tasks[t.id] = { status: 'done' };
+        save(); renderBalance(); renderTasks(); haptic('medium'); toast('Claimed ' + fmt(t.reward) + ' MOONX');
+      }
+    });
+    li.append(info, b); list.appendChild(li);
+  });
+}
+
+/* ============ Friends ============ */
+const refLink = CONFIG.botLink + '?startapp=ref_' + ((tgUser && tgUser.id) || 'guest');
+$('refLink').textContent = refLink;
+$('friendsSub').textContent = 'Invite a friend. You both get ' + fmt(CONFIG.referralReward) + ' MOONX when they join.';
+function copyText(text) {
+  const done = () => toast('Link copied');
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, done);
+  else { const a = document.createElement('textarea'); a.value = text; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); } catch (e) {} a.remove(); done(); }
+}
+$('copyBtn').addEventListener('click', () => copyText(refLink));
+$('shareBtn').addEventListener('click', () => {
+  const text = 'Join me on MOONX and collect coins from the moon.';
+  if (tg) tg.openTelegramLink('https://t.me/share/url?url=' + encodeURIComponent(refLink) + '&text=' + encodeURIComponent(text));
+  else if (navigator.share) navigator.share({ title: 'MOONX', text, url: refLink }).catch(() => {});
+  else copyText(refLink);
+});
+
+/* ============ Tabs ============ */
+function setTab(name) {
+  document.body.dataset.tab = name;
+  ['home', 'tasks', 'friends'].forEach((n) => { $('view-' + n).hidden = n !== name; });
+  document.querySelectorAll('.tabs button').forEach((b) => {
+    if (b.dataset.tab === name) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+  });
+  haptic('light');
+}
+document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.tab)));
+
+/* ============ 3D moon ============ */
+function makeMoonTexture() {
+  const w = 1024, h = 512, c = document.createElement('canvas'); c.width = w; c.height = h;
+  const g = c.getContext('2d');
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  g.fillStyle = '#a19fab'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 16; i++) {                       // dark plains
+    const x = rnd() * w, y = h * 0.2 + rnd() * h * 0.6, r = 40 + rnd() * 110;
+    const gr = g.createRadialGradient(x, y, 0, x, y, r);
+    gr.addColorStop(0, 'rgba(66,66,86,.55)'); gr.addColorStop(1, 'rgba(66,66,86,0)');
+    g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  for (let i = 0; i < 9000; i++) {                     // dust grain
+    g.fillStyle = rnd() > 0.5 ? 'rgba(255,255,255,.05)' : 'rgba(0,0,0,.06)';
+    g.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 2, 1 + rnd() * 2);
+  }
+  for (let i = 0; i < 280; i++) {                      // craters
+    const r = 3 + Math.pow(rnd(), 3) * 38, x = rnd() * w, y = h * 0.12 + rnd() * h * 0.76;
+    const gr = g.createRadialGradient(x, y, r * 0.2, x, y, r);
+    gr.addColorStop(0, 'rgba(38,38,56,.55)'); gr.addColorStop(0.75, 'rgba(38,38,56,.25)');
+    gr.addColorStop(0.92, 'rgba(255,255,255,.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+  }
+  const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4; return tex;
+}
+
+function init3D() {
+  if (!window.THREE) return false;
+  const canvas = $('scene');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 200);
+
+  const rig = new THREE.Group(); scene.add(rig);
+
+  const tex = makeMoonTexture();
+  const moon = new THREE.Mesh(
+    new THREE.SphereGeometry(2, 96, 96),
+    new THREE.MeshStandardMaterial({ map: tex, bumpMap: tex, bumpScale: 1.6, roughness: 1, metalness: 0 })
+  );
+  rig.add(moon);
+
+  const glow = new THREE.Mesh(
+    new THREE.SphereGeometry(2.45, 64, 64),
+    new THREE.ShaderMaterial({
+      vertexShader: 'varying vec3 vN; void main(){ vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+      fragmentShader: 'varying vec3 vN; void main(){ float i = pow(max(0.0, 0.68 - dot(vN, vec3(0.0,0.0,1.0))), 3.0); gl_FragColor = vec4(0.56,0.61,1.0,1.0) * i; }',
+      side: THREE.BackSide, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false
+    })
+  );
+  rig.add(glow);
+
+  // Ring of coins orbiting the moon
+  const tilt = new THREE.Group(); tilt.rotation.set(0.25, 0, 0.35); rig.add(tilt);
+  const ring = new THREE.Group(); tilt.add(ring);
+  const coinGeo = new THREE.CylinderGeometry(0.11, 0.11, 0.03, 24); coinGeo.rotateX(Math.PI / 2);
+  const coinMat = new THREE.MeshStandardMaterial({ color: 0xFF9A4D, emissive: 0x6a2a00, metalness: 0.6, roughness: 0.35 });
+  const COINS = 22, R = 2.7;
+  for (let i = 0; i < COINS; i++) {
+    const a = (i / COINS) * Math.PI * 2, coin = new THREE.Mesh(coinGeo, coinMat);
+    coin.position.set(Math.cos(a) * R, 0, Math.sin(a) * R); coin.lookAt(0, 0, 0); ring.add(coin);
+  }
+
+  // Stars
+  const N = 1200, pos = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    const r = 40 + Math.random() * 50, th = Math.random() * Math.PI * 2, ph = Math.acos(2 * Math.random() - 1);
+    pos[i * 3] = r * Math.sin(ph) * Math.cos(th); pos[i * 3 + 1] = r * Math.sin(ph) * Math.sin(th); pos[i * 3 + 2] = r * Math.cos(ph);
+  }
+  const starGeo = new THREE.BufferGeometry(); starGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xcfd6ff, size: 0.18, sizeAttenuation: true, transparent: true, opacity: 0.8 })));
+
+  // Light
+  scene.add(new THREE.AmbientLight(0x2a3070, 0.7));
+  const key = new THREE.DirectionalLight(0xfff4e6, 2.3); key.position.set(-4, 3, 5); scene.add(key);
+  const rim = new THREE.DirectionalLight(0x8E9BFF, 1.5); rim.position.set(4, 2, -4); scene.add(rim);
+
+  function resize() {
+    const w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.position.set(0, 0, Math.max(11, 9.4 / camera.aspect));   // keeps the moon ~60% of screen width on phones
+    camera.updateProjectionMatrix();
+  }
+  resize(); window.addEventListener('resize', resize);
+
+  let tx = 0, ty = 0;
+  window.addEventListener('pointermove', (e) => { tx = (e.clientX / innerWidth - 0.5) * 0.35; ty = (e.clientY / innerHeight - 0.5) * 0.25; });
+
+  const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+  canvas.addEventListener('pointerdown', (e) => {
+    if (document.body.dataset.tab !== 'home') return;
+    const r = canvas.getBoundingClientRect();
+    mouse.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(mouse, camera);
+    if (ray.intersectObject(moon).length) tap(e.clientX, e.clientY);
+  });
+
+  (function loop() {
+    requestAnimationFrame(loop);
+    if (document.hidden) return;
+    if (!reduce) { moon.rotation.y += 0.0016; ring.rotation.y += 0.004; }
+    pulse *= 0.88; moon.scale.setScalar(1 + pulse);
+    rig.rotation.x += (ty - rig.rotation.x) * 0.05;
+    rig.rotation.y += (tx - rig.rotation.y) * 0.05;
+    renderer.render(scene, camera);
+  })();
+  return true;
+}
+
+/* ============ Boot ============ */
+try { if (!init3D()) throw new Error('no three'); } catch (e) { document.body.classList.add('no3d'); }
+$('who').textContent = 'Hi, ' + ((tgUser && tgUser.first_name) || 'Explorer');
+renderBalance(); renderTasks(); farmTick();
+setInterval(farmTick, 1000);
+</script>
+</body>
+</html>
