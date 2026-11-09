@@ -1,147 +1,28 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MOONX App</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background: #060814;
-            color: #ffffff;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: space-between;
-            height: 100vh;
-            overflow: hidden;
-        }
-        .container {
-            text-align: center;
-            margin-top: 40px;
-        }
-        h1 {
-            font-size: 36px;
-            margin: 10px 0;
-            background: linear-gradient(45deg, #00d2ff, #3a7bd5);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        .score {
-            font-size: 48px;
-            font-weight: bold;
-            margin-bottom: 20px;
-        }
-        .coin-container {
-            position: relative;
-            width: 220px;
-            height: 220px;
-            margin: 0 auto;
-            cursor: pointer;
-            perspective: 1000px;
-        }
-        .coin {
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            background: radial-gradient(circle, #3a7bd5 0%, #00d2ff 100%);
-            box-shadow: 0 0 40px rgba(0, 210, 255, 0.6), inset 0 0 20px rgba(255, 255, 255, 0.4);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 32px;
-            font-weight: bold;
-            color: white;
-            transition: transform 0.1s ease;
-            user-select: none;
-        }
-        .coin:active {
-            transform: scale(0.92) rotateX(10deg);
-        }
-        .nav-bar {
-            width: 100%;
-            background: #0f172a;
-            padding: 15px 0;
-            display: flex;
-            justify-content: space-around;
-            border-top: 1px solid #1e293b;
-        }
-        .nav-item {
-            color: #94a3b8;
-            font-size: 14px;
-            cursor: pointer;
-        }
-        .nav-item.active {
-            color: #00d2ff;
-            font-weight: bold;
-        }
-    </style>
+    <meta name="viewport" content=
+        "width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href=
+        "style.css?_cacheOverride=1606401798626">
+
+    <link href=
+"https://fonts.googleapis.com/css2?family=Ubuntu:ital, 
+        wght@0, 300;1, 700&display=swap"
+        rel="stylesheet">
 </head>
+
 <body>
-
+    <h1 id="gameName">Welcome to Dragon's world</h1>
     <div class="container">
-        <p>MOONX Balance</p>
-        <div class="score" id="score">0</div>
-        
-        <div class="coin-container" id="click-btn">
-            <div class="coin">MOONX</div>
-        </div>
+        <div class="gameover">Game Over</div>
+        <div id="scorecount">Your score : 0</div>
+        <div class="obstacle animateobstacle"></div>
+        <div class="dragon" style="left: 426px;"></div>
     </div>
-
-    <div class="nav-bar">
-        <div class="nav-item active">Moon</div>
-        <div class="nav-item">Tasks</div>
-        <div class="nav-item">Friends</div>
-    </div>
-
-    <script>
-        // إعدادات اتصال Supabase
-        const SUPABASE_URL = 'https://mivrprnbvuitiisbycbt.supabase.co';
-        const SUPABASE_ANON_KEY = 'sb_publishable_NqT3_735ow4j7J9r6J3Z4Q_FuQYjkVu';
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-        // جلب معرف المستخدم من تيليجرام أو افتراضي للتجربة
-        const tg = window.Telegram.WebApp;
-        tg.expand();
-        const telegramId = tg.initDataUnsafe?.user?.id || 123456789;
-
-        let currentScore = 0;
-
-        async function loadUserData() {
-            let { data, error } = await supabaseClient
-                .from('users')
-                .select('balance')
-                .eq('telegram_id', telegramId)
-                .single();
-
-            if (data) {
-                currentScore = data.balance;
-                document.getElementById('score').innerText = currentScore;
-            } else {
-                // إذا كان مستخدماً جديداً، نقوم بإنشاء سجل له في القاعدة
-                await supabaseClient.from('users').insert([{ telegram_id: telegramId, balance: 0 }]);
-            }
-        }
-
-        async function updateScore() {
-            currentScore += 1;
-            document.getElementById('score').innerText = currentScore;
-
-            // تحديث النقاط في قاعدة البيانات
-            await supabaseClient
-                .from('users')
-                .update({ balance: currentScore })
-                .eq('telegram_id', telegramId);
-        }
-
-        document.getElementById('click-btn').addEventListener('click', updateScore);
-
-        // تحميل البيانات عند فتح التطبيق
-        loadUserData();
-    </script>
 </body>
+
 </html>
